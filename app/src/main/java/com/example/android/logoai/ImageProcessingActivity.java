@@ -2,12 +2,10 @@ package com.example.android.logoai;
 
 import android.content.Intent;
 import android.graphics.Bitmap;
-import android.graphics.BitmapFactory;
 import android.net.Uri;
 import android.os.Bundle;
 import android.provider.MediaStore;
 import android.support.v7.app.AppCompatActivity;
-import android.util.Base64;
 import android.util.Log;
 import android.widget.ImageView;
 import android.widget.TextView;
@@ -29,22 +27,13 @@ import org.apache.http.entity.mime.MultipartEntityBuilder;
 import org.json.JSONException;
 import org.json.JSONObject;
 
-import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 
 public class ImageProcessingActivity extends AppCompatActivity {
 
-    private static String serverUrl = "http://192.168.1.37:8000/imagerecognition";
-
-    private int processingStep;
-    private static String[] stepsLabels = new String[]{
-            "Envoi de l'image vers le serveur",
-            "Détection des zones d'intérêt",
-            "Reconnaissance d'informations sur la zone d'intérêt",
-            "Information reçue"
-    };
+    private static String serverUrl = "http://192.168.1.37:8000/img_searches";
 
     private VolleyError lastError = null;
 
@@ -81,7 +70,6 @@ public class ImageProcessingActivity extends AppCompatActivity {
         imageView = findViewById(R.id.imageProcessing);
         textView = findViewById(R.id.consoleTextView);
 
-        processingStep = 0;
         requestQueue = Volley.newRequestQueue(this);
 
         updateView();
@@ -95,16 +83,19 @@ public class ImageProcessingActivity extends AppCompatActivity {
 
     }
 
-    private void updateView() {
+    private void updateView(String message) {
         imageView.setImageBitmap(image);
-        if (lastError == null)
-            addLine(stepsLabels[processingStep]);
-        else {
+        if (message != null) {
+            addLine(message);
+        } else if (lastError != null){
             if (lastError.networkResponse != null)
                 addLine("Erreur : " + lastError.networkResponse.statusCode);
             else
                 addLine("Erreur : " + lastError.getMessage());
         }
+    }
+    private void updateView(){
+        updateView(null);
     }
 
     private void postImage() {
@@ -126,7 +117,7 @@ public class ImageProcessingActivity extends AppCompatActivity {
 
             MyRequest myRequest = new MyRequest(
                     Request.Method.POST,
-                    serverUrl + "/engage",
+                    serverUrl,
                     new Response.Listener<NetworkResponse>() {
                         @Override
                         public void onResponse(NetworkResponse response) {
@@ -136,10 +127,8 @@ public class ImageProcessingActivity extends AppCompatActivity {
                                 Log.d("Response", jsonString);
                                 if (json.getBoolean("Success")) {
                                     imageServerId = json.getInt("Key");
-                                    processingStep++;
-                                    updateView();
-                                    if (processingStep < stepsLabels.length - 1)
-                                        requestStep();
+                                    updateView("Image reçue par le serveur");
+                                    getData();
                                 } else {
                                     lastError = new VolleyError(json.getString("Message"));
                                     updateView();
@@ -173,30 +162,23 @@ public class ImageProcessingActivity extends AppCompatActivity {
                     return bos.toByteArray();
                 }
             };
+            updateView("Envoi de l'image vers le serveur...");
             requestQueue.add(myRequest);
         }
     }
 
-    private void requestStep() {
+    private void getData() {
         JsonObjectRequest request = new JsonObjectRequest(
                 Request.Method.GET,
-                serverUrl + "/step/" + imageServerId + "/" + Integer.toString(processingStep),
+                String.format("%s/%s", serverUrl, imageServerId),
                 null,
                 new Response.Listener<JSONObject>() {
                     @Override
                     public void onResponse(JSONObject response) {
                         try {
                             if (response.getBoolean("Success")) {
-
-                                if (processingStep < stepsLabels.length - 1) {
-                                    String b64EncodedBytes = response.getString("Data");
-                                    ByteArrayInputStream bais = new ByteArrayInputStream(Base64.decode(b64EncodedBytes, Base64.DEFAULT));
-                                    image = BitmapFactory.decodeStream(bais);
-                                    requestStep();
-                                } else {
-                                    addLine((response.getJSONObject("Data")).toString());
-                                }
-                                processingStep++;
+                                updateView("Données reçues avec succès");
+                                addLine((response.getJSONObject("Data")).toString());
                                 updateView();
                             } else {
                                 lastError = new VolleyError(response.getString("Message"));
@@ -214,6 +196,7 @@ public class ImageProcessingActivity extends AppCompatActivity {
                         updateView();
                     }
                 });
+        updateView("Récupération des données du serveur...");
         requestQueue.add(request);
     }
 }
