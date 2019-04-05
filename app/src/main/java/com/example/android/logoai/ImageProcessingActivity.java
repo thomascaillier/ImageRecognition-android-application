@@ -6,6 +6,9 @@ import android.net.Uri;
 import android.os.Bundle;
 import android.provider.MediaStore;
 import android.support.v7.app.AppCompatActivity;
+import android.support.v7.widget.LinearLayoutManager;
+import android.support.v7.widget.RecyclerView;
+import android.text.method.ScrollingMovementMethod;
 import android.util.Log;
 import android.widget.ImageView;
 import android.widget.TextView;
@@ -24,12 +27,15 @@ import org.apache.http.HttpEntity;
 import org.apache.http.entity.ContentType;
 import org.apache.http.entity.mime.HttpMultipartMode;
 import org.apache.http.entity.mime.MultipartEntityBuilder;
+import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
+import java.util.ArrayList;
+import java.util.List;
 
 public class ImageProcessingActivity extends AppCompatActivity {
 
@@ -40,10 +46,14 @@ public class ImageProcessingActivity extends AppCompatActivity {
     private RequestQueue requestQueue;
 
     private Bitmap image;
+    public ResultImageAdapter getAdapter(){
+        return ((ResultImageAdapter)recyclerList.getAdapter());
+    }
     HttpEntity httpEntity;
 
     public ImageView imageView;
     public TextView textView;
+    public RecyclerView recyclerList;
     private int imageServerId;
 
     @Override
@@ -69,8 +79,20 @@ public class ImageProcessingActivity extends AppCompatActivity {
 
         imageView = findViewById(R.id.imageProcessing);
         textView = findViewById(R.id.consoleTextView);
+        if (BuildConfig.DEBUG) {
+            textView.setMovementMethod(new ScrollingMovementMethod());
+        } else {
+            textView.setHeight(0);
+        }
 
         requestQueue = Volley.newRequestQueue(this);
+
+        recyclerList = (RecyclerView) findViewById(R.id.cardList);
+        recyclerList.setHasFixedSize(true);
+        LinearLayoutManager llm = new LinearLayoutManager(this);
+        llm.setOrientation(LinearLayoutManager.VERTICAL);
+        recyclerList.setLayoutManager(llm);
+        recyclerList.setAdapter(new ResultImageAdapter());
 
         updateView();
         postImage();
@@ -86,7 +108,7 @@ public class ImageProcessingActivity extends AppCompatActivity {
     private void updateView(String message) {
         imageView.setImageBitmap(image);
         if (message != null) {
-            addLine(message);
+            //addLine(message);
         } else if (lastError != null){
             if (lastError.networkResponse != null)
                 addLine("Erreur : " + lastError.networkResponse.statusCode);
@@ -179,6 +201,12 @@ public class ImageProcessingActivity extends AppCompatActivity {
                             if (response.getBoolean("Success")) {
                                 updateView("Données reçues avec succès");
                                 addLine((response.getJSONObject("Data")).toString());
+                                JSONArray array = response.getJSONObject("Data").getJSONArray("ResultImages");
+                                for(int i = 0; i < array.length(); i++){
+                                    JSONObject jsonResult = array.getJSONObject(i);
+                                    ResultImageData result = new ResultImageData(jsonResult);
+                                    getAdapter().addItem(result);
+                                }
                                 updateView();
                             } else {
                                 lastError = new VolleyError(response.getString("Message"));
