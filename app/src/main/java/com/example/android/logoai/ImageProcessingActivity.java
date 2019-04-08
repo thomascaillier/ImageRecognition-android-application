@@ -13,10 +13,12 @@ import android.util.Log;
 import android.widget.ImageView;
 import android.widget.TextView;
 
+import com.android.volley.DefaultRetryPolicy;
 import com.android.volley.NetworkResponse;
 import com.android.volley.Request;
 import com.android.volley.RequestQueue;
 import com.android.volley.Response;
+import com.android.volley.RetryPolicy;
 import com.android.volley.VolleyError;
 import com.android.volley.VolleyLog;
 import com.android.volley.toolbox.HttpHeaderParser;
@@ -39,7 +41,7 @@ import java.util.List;
 
 public class ImageProcessingActivity extends AppCompatActivity {
 
-    private static String serverUrl = "http://192.168.1.37:8000/img_searches";
+    private static String serverUrl = "http://192.168.1.47:8000/img_searches";
 
     private VolleyError lastError = null;
 
@@ -224,6 +226,11 @@ public class ImageProcessingActivity extends AppCompatActivity {
                         updateView();
                     }
                 });
+
+        int socketTimeout = 30000;
+        RetryPolicy policy = new DefaultRetryPolicy(socketTimeout, DefaultRetryPolicy.DEFAULT_MAX_RETRIES, DefaultRetryPolicy.DEFAULT_BACKOFF_MULT);
+        request.setRetryPolicy(policy);
+
         updateView("Récupération des données du serveur...");
         requestQueue.add(request);
     }
